@@ -1,3 +1,5 @@
+package main.Client;
+
 // Client Class
 public class Client {
     // TODO: Implement the client-side operations
@@ -5,6 +7,7 @@ public class Client {
     // TODO: Add constructor and necessary methods
 
     public static void main(String[] args) {
+        System.out.println("hi");
         // TODO: Implement the main method to start the client
     }
 }
