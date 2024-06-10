@@ -15,7 +15,7 @@ public class Server {
         this.server = server;
     }
 
-    public void startServer(){
+    public void startServer() {
         try {
             while (!server.isClosed()) {
                 Socket socket = server.accept();
@@ -24,16 +24,16 @@ public class Server {
                 Thread thread = new Thread(clientHandler);
                 threadPool.execute(thread);
             }
-        }catch (IOException e){
+        } catch (IOException e) {
             System.out.println(e.getMessage());
-        }finally {
+        } finally {
             stopServer();
             threadPool.shutdown();
         }
     }
-    public void stopServer(){
+
+    public void stopServer() {
         try {
-            // avoid nullPointer exception and close server
             if (server != null)
                 server.close();
         } catch (IOException e) {

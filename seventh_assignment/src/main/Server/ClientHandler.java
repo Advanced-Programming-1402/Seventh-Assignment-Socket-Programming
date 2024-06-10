@@ -3,10 +3,11 @@ package main.Server;
 import java.io.*;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.List;
 
 public class ClientHandler implements Runnable {
     private static final ArrayList<ClientHandler> clientHandlers = new ArrayList<>();
-    private ArrayList<String> allMesagges;
+    private static final List<String> allMessages = new ArrayList<>();
     private Socket socket;
     private String clientUsername;
     private DataInputStream in;
@@ -19,6 +20,13 @@ public class ClientHandler implements Runnable {
             this.out = new DataOutputStream(socket.getOutputStream());
             this.clientUsername = in.readUTF();
             clientHandlers.add(this);
+
+            // Send all previous messages to the new client
+            for (String message : allMessages) {
+                out.writeUTF(message);
+                out.flush();
+            }
+
             broadcastMsg(" > Server: " + clientUsername + " has joined the chat!");
         } catch (IOException e) {
             closeAll();
@@ -30,42 +38,36 @@ public class ClientHandler implements Runnable {
         try {
             String choice = in.readUTF();
             switch (choice) {
-                case "sendmsg" ->  messageMenu();
+                case "sendmsg" -> messageMenu();
                 case "downfl" -> downloadMenu();
-                default ->  System.out.println("> Invalid choice.");
+                default -> System.out.println("> Invalid choice.");
             }
-        }catch (IOException e) {
+        } catch (IOException e) {
             closeAll();
         }
     }
+
     // message handler:
-    public void messageMenu(){
-        // write previous messages in chat
-        for (String msg : allMesagges){
-            try {
-                out.writeUTF(msg);
-                out.flush();
-            }catch (IOException e){
-                closeAll();
-            }
-        }
-        // write message
+    public void messageMenu() {
         String msgFromClient;
-        while (socket.isConnected()){
+        while (socket.isConnected()) {
             try {
                 msgFromClient = in.readUTF();
+                synchronized (allMessages) {
+                    allMessages.add(msgFromClient);
+                }
                 broadcastMsg(msgFromClient);
-            }catch (IOException e){
+            } catch (IOException e) {
                 closeAll();
                 break;
             }
         }
     }
 
-    public void broadcastMsg(String msg){
-        for (ClientHandler clientHandler: clientHandlers){
+    public void broadcastMsg(String msg) {
+        for (ClientHandler clientHandler : clientHandlers) {
             try {
-                if (!clientHandler.clientUsername.equals(clientUsername)){
+                if (!clientHandler.clientUsername.equals(clientUsername)) {
                     clientHandler.out.writeUTF(msg);
                     clientHandler.out.flush();
                 }
@@ -75,7 +77,7 @@ public class ClientHandler implements Runnable {
         }
     }
 
-    public  void removeClientHandler(){
+    public void removeClientHandler() {
         clientHandlers.remove(this);
         broadcastMsg(" > Server: " + clientUsername + " has left the chat!");
     }
@@ -83,74 +85,56 @@ public class ClientHandler implements Runnable {
     public void closeAll() {
         removeClientHandler();
         try {
-            if (in != null) {
-                in.close();
-            }
-            if (out != null) {
-                out.close();
-            }
-            if (socket != null) {
-                socket.close();
-            }
+            if (in != null) in.close();
+            if (out != null) out.close();
+            if (socket != null) socket.close();
         } catch (IOException e) {
             System.out.println(e.getMessage());
         }
     }
-    // download handler:
-    public void downloadMenu() {
-        File[] files = new File("data").listFiles();
-        if (files == null) {
-            System.out.println("no files found");
-            return;
+
+    private void sendFile(File file) {
+        try (FileInputStream fileInputStream = new FileInputStream(file)) {
+
+            long fileSize = file.length();
+            out.writeLong(fileSize);
+            out.flush();
+
+            byte[] buffer = new byte[4096];
+            int bytesRead;
+            while ((bytesRead = fileInputStream.read(buffer)) != -1) {
+                out.write(buffer, 0, bytesRead);
+            }
+            out.flush();
+            out.writeUTF("done");
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
         }
+    }
+
+    private void downloadMenu() {
+        File folder = new File("C:\\CS SBU AP\\Seventh-Assignment-Socket-Programming\\seventh_assignment\\src\\main\\resources\\data");
+        File[] listOfFiles = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".txt"));
 
         try {
-            out.writeInt(files.length);
-        } catch (IOException e) {
-            closeAll();
-        }
-        int i = 1;
-        for (File file : files) {
-            try {
-                out.writeUTF(i + "_ " + file.getName());
-                out.flush();
-                i++;
-            } catch (IOException e) {
-                closeAll();
+            StringBuilder fileList = new StringBuilder();
+            for (int i = 0; i < listOfFiles.length; i++) {
+                fileList.append((i + 1)).append(": ").append(listOfFiles[i].getName()).append("\n");
             }
-        }
 
-        int index;
-        while (socket.isConnected()) {
-            try {
-                index = in.readInt();
-                downloadFile(index);
-            } catch (IOException e) {
-                closeAll();
-                break;
-            }
-        }
-    }
-
-    public void downloadFile(int fileIndex) throws IOException {
-        File[] files = new File("data").listFiles();
-        assert files != null;
-
-        int bytes;
-        File file = files[fileIndex - 1];
-        FileInputStream fileInputStream = new FileInputStream(file);
-
-        out.writeUTF(file.getName());
-        out.writeInt((int) file.length());
-        out.flush();
-
-        byte[] buffer = new byte[4 * 1024];
-        while ((bytes = fileInputStream.read(buffer)) != -1) {
-            out.write(buffer, 0, bytes);
+            out.writeUTF(fileList.toString());
             out.flush();
+
+            int fileChoice = Integer.parseInt(in.readUTF()) - 1;
+            if (fileChoice >= 0 && fileChoice < listOfFiles.length) {
+                sendFile(listOfFiles[fileChoice]);
+            } else {
+                out.writeUTF("Invalid file choice");
+                out.flush();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        fileInputStream.close();
     }
-
 }
