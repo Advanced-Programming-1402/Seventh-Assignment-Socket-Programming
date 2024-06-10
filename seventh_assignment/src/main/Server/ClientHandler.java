@@ -114,7 +114,7 @@ public class ClientHandler implements Runnable {
     }
 
     private void downloadMenu() {
-        File folder = new File("C:\\CS SBU AP\\Seventh-Assignment-Socket-Programming\\seventh_assignment\\src\\main\\resources\\data");
+        File folder = new File("C:\\CS SBU AP\\Seventh-Assignment-Socket-Programming\\data");
         File[] listOfFiles = folder.listFiles((dir, name) -> name.toLowerCase().endsWith(".txt"));
 
         try {
